@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Excel Combiner</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.1/xlsx.full.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.19.1/package/dist/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -28,6 +28,10 @@
       background-color: #cccccc;
       cursor: not-allowed;
     }
+    #progress {
+      margin-top: 20px;
+      text-align: left;
+    }
     #output {
       margin-top: 20px;
       color: green;
@@ -40,11 +44,13 @@
   <input type="file" id="fileInput" multiple accept=".xlsx, .xls" />
   <br />
   <button id="combineButton" disabled>Combine and Download</button>
+  <div id="progress"></div>
   <div id="output"></div>
 
   <script>
     const fileInput = document.getElementById("fileInput");
     const combineButton = document.getElementById("combineButton");
+    const progressDiv = document.getElementById("progress");
     const outputDiv = document.getElementById("output");
 
     let fileData = []; // Store data from uploaded files
@@ -59,26 +65,40 @@
     fileInput.addEventListener("change", (event) => {
       fileData = Array.from(event.target.files);
       combineButton.disabled = fileData.length === 0;
-      outputDiv.textContent = `${fileData.length} files selected.`;
+      progressDiv.innerHTML = `${fileData.length} files selected.`;
     });
 
     // Function to process and combine files
     async function processFiles() {
-      outputDiv.textContent = "Processing files...";
+      outputDiv.textContent = "";
+      progressDiv.innerHTML = "Processing files...<br>";
+      const totalFiles = fileData.length;
 
-      for (let file of fileData) {
-        const fileBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(fileBuffer, { type: "array" });
+      for (let i = 0; i < totalFiles; i++) {
+        const file = fileData[i];
+        try {
+          const fileBuffer = await file.arrayBuffer();
+          const workbook = XLSX.read(fileBuffer, { type: "array" });
 
-        sheetNames.forEach((sheetName) => {
-          const sheet = workbook.Sheets[sheetName];
-          if (sheet) {
-            const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-            if (sheetData.length > 0) {
-              combinedSheets[sheetName].push(...sheetData);
+          sheetNames.forEach((sheetName) => {
+            const sheet = workbook.Sheets[sheetName];
+            if (sheet) {
+              const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+              if (sheetData.length > 0) {
+                if (combinedSheets[sheetName].length === 0) {
+                  combinedSheets[sheetName].push(sheetData[0]); // Add header row
+                }
+                combinedSheets[sheetName].push(...sheetData.slice(1)); // Add data rows
+              }
             }
-          }
-        });
+          });
+
+          // Update progress
+          const percentage = Math.round(((i + 1) / totalFiles) * 100);
+          progressDiv.innerHTML += `Processed ${file.name} (${percentage}%)<br>`;
+        } catch (error) {
+          progressDiv.innerHTML += `Error processing ${file.name}: ${error.message}<br>`;
+        }
       }
 
       outputDiv.textContent = "Files processed. Preparing combined file for download...";
