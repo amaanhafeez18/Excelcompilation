@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Excel Combiner</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.1/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+      text-align: center;
+    }
+    input[type="file"] {
+      margin: 20px 0;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    #output {
+      margin-top: 20px;
+      color: green;
+    }
+  </style>
+</head>
+<body>
+  <h1>Excel File Combiner</h1>
+  <p>Upload Excel files, and we’ll combine them for you.</p>
+  <input type="file" id="fileInput" multiple accept=".xlsx, .xls" />
+  <br />
+  <button id="combineButton" disabled>Combine and Download</button>
+  <div id="output"></div>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const combineButton = document.getElementById("combineButton");
+    const outputDiv = document.getElementById("output");
+
+    let fileData = []; // Store data from uploaded files
+    const sheetNames = ["Company Details", "Financial Info", "Executive"];
+    const combinedSheets = {
+      "Company Details": [],
+      "Financial Info": [],
+      "Executive": [],
+    };
+
+    // Enable the combine button when files are selected
+    fileInput.addEventListener("change", (event) => {
+      fileData = Array.from(event.target.files);
+      combineButton.disabled = fileData.length === 0;
+      outputDiv.textContent = `${fileData.length} files selected.`;
+    });
+
+    // Function to process and combine files
+    async function processFiles() {
+      outputDiv.textContent = "Processing files...";
+
+      for (let file of fileData) {
+        const fileBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(fileBuffer, { type: "array" });
+
+        sheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          if (sheet) {
+            const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            if (sheetData.length > 0) {
+              combinedSheets[sheetName].push(...sheetData);
+            }
+          }
+        });
+      }
+
+      outputDiv.textContent = "Files processed. Preparing combined file for download...";
+      createCombinedWorkbook();
+    }
+
+    // Create combined workbook and download
+    function createCombinedWorkbook() {
+      const newWorkbook = XLSX.utils.book_new();
+
+      sheetNames.forEach((sheetName) => {
+        if (combinedSheets[sheetName].length > 0) {
+          const worksheet = XLSX.utils.aoa_to_sheet(combinedSheets[sheetName]);
+          XLSX.utils.book_append_sheet(newWorkbook, worksheet, sheetName);
+        }
+      });
+
+      XLSX.writeFile(newWorkbook, "Combined_Workbook.xlsx");
+      outputDiv.textContent = "Download complete!";
+    }
+
+    // Event listener for the combine button
+    combineButton.addEventListener("click", processFiles);
+  </script>
+</body>
+</html>
