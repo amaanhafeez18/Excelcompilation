@@ -1,98 +1,98 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Excel Combiner</title>
-  <script src="https://cdn.sheetjs.com/xlsx-0.19.1/package/dist/xlsx.full.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 600px;
-      margin: auto;
-      text-align: center;
-    }
-    input[type="file"] {
-      margin: 20px 0;
-    }
-    button {
-      padding: 10px 20px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:disabled {
-      background-color: #cccccc;
-      cursor: not-allowed;
-    }
-    #progress {
-      margin-top: 20px;
-      text-align: left;
-    }
-    #output {
-      margin-top: 20px;
-      color: green;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Excel Combiner</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.19.1/package/dist/xlsx.full.min.js"></script>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    max-width: 600px;
+    margin: auto;
+    text-align: center;
+  }
+  input[type="file"] {
+    margin: 20px 0;
+  }
+  button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  #progress {
+    margin-top: 20px;
+    text-align: left;
+  }
+  #output {
+    margin-top: 20px;
+    color: green;
+  }
+</style>
 </head>
 <body>
-  <h1>Excel File Combiner</h1>
-  <p>Upload Excel files, and we’ll combine them for you.</p>
-  <input type="file" id="fileInput" multiple accept=".xlsx, .xls" />
-  <br />
-  <button id="combineButton" disabled>Combine and Download</button>
-  <div id="progress"></div>
-  <div id="output"></div>
-  <script>
-    const fileInput = document.getElementById("fileInput");
-    const combineButton = document.getElementById("combineButton");
-    const progressDiv = document.getElementById("progress");
-    const outputDiv = document.getElementById("output");
-    let fileData = [];
+  <h1>Excel File Combiner</h1>
+  <p>Upload Excel files, and we’ll combine them for you.</p>
+  <input type="file" id="fileInput" multiple accept=".xlsx, .xls" />
+  <br />
+  <button id="combineButton" disabled>Combine and Download</button>
+  <div id="progress"></div>
+  <div id="output"></div>
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const combineButton = document.getElementById("combineButton");
+    const progressDiv = document.getElementById("progress");
+    const outputDiv = document.getElementById("output");
+    let fileData = [];
 
-    fileInput.addEventListener("change", (event) => {
-      fileData = Array.from(event.target.files);
-      combineButton.disabled = fileData.length === 0;
-      progressDiv.innerHTML = `${fileData.length} files selected.`;
-    });
+    fileInput.addEventListener("change", (event) => {
+      fileData = Array.from(event.target.files);
+      combineButton.disabled = fileData.length === 0;
+      progressDiv.innerHTML = `${fileData.length} files selected.`;
+    });
 
-    const worker = new Worker('worker.js');
+    const worker = new Worker('worker.js');
+    worker.onmessage = function(event) {
+      if (event.data.type === 'progress') {
+        progressDiv.innerHTML += `${event.data.message}<br>`;
+      } else if (event.data.type === 'complete') {
+        outputDiv.textContent = "Files processed. Preparing combined file for download...";
+        createAndDownloadWorkbook(event.data.combinedSheets);
+      } else if (event.data.type === 'error') {
+        progressDiv.innerHTML += `Error processing ${event.data.file}: ${event.data.error}<br>`;
+      }
+    };
 
-    worker.onmessage = function(event) {
-      if (event.data.type === 'progress') {
-        progressDiv.innerHTML += `${event.data.message}<br>`;
-      } else if (event.data.type === 'complete') {
-        outputDiv.textContent = "Files processed. Preparing combined file for download...";
-        createAndDownloadWorkbook(event.data.combinedSheets);
-      } else if (event.data.type === 'error') {
-        progressDiv.innerHTML += `Error processing ${event.data.file}: ${event.data.error}<br>`;
-      }
-    };
+    function createAndDownloadWorkbook(combinedSheets) {
+      const newWorkbook = XLSX.utils.book_new();
+      for (const sheetName in combinedSheets) {
+        if (combinedSheets[sheetName].length > 0) {
+          const worksheet = XLSX.utils.aoa_to_sheet(combinedSheets[sheetName]);
+          XLSX.utils.book_append_sheet(newWorkbook, worksheet, sheetName);
+        }
+      }
+      XLSX.writeFile(newWorkbook, "Combined_Workbook.xlsx", { compression: true });
+      outputDiv.textContent = "Download complete!";
+    }
 
-    function createAndDownloadWorkbook(combinedSheets) {
-      const newWorkbook = XLSX.utils.book_new();
-      for (const sheetName in combinedSheets) {
-        if (combinedSheets[sheetName].length > 0) {
-          const worksheet = XLSX.utils.aoa_to_sheet(combinedSheets[sheetName]);
-          XLSX.utils.book_append_sheet(newWorkbook, worksheet, sheetName);
-        }
-      }
-      XLSX.writeFile(newWorkbook, "Combined_Workbook.xlsx", { compression: true });
-      outputDiv.textContent = "Download complete!";
-    }
-
-    combineButton.addEventListener("click", async () => {
-       outputDiv.textContent = "";
-       progressDiv.innerHTML = "Processing files...<br>";
-       const filesData = await Promise.all(fileData.map(async f => ({
-           name: f.name,
-           buffer: await f.arrayBuffer()  // Await the promise and get the buffer
-       })));
-       worker.postMessage(filesData);  // Pass the resolved buffers
-   });
-  </script>
+    combineButton.addEventListener("click", async () => {
+      outputDiv.textContent = "";
+      progressDiv.innerHTML = "Processing files...<br>";
+      const filesData = await Promise.all(fileData.map(async (file) => ({
+        name: file.name,
+        buffer: await file.arrayBuffer()
+      })));
+      worker.postMessage(filesData);
+    });
+  </script>
 </body>
 </html>
