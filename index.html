@@ -88,7 +88,9 @@
                 if (combinedSheets[sheetName].length === 0) {
                   combinedSheets[sheetName].push(sheetData[0]); // Add header row
                 }
-                combinedSheets[sheetName].push(...sheetData.slice(1)); // Add data rows
+                // Filter out empty rows
+                const dataRows = sheetData.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== null));
+                combinedSheets[sheetName].push(...dataRows); // Add only non-empty data rows
               }
             }
           });
@@ -116,7 +118,8 @@
         }
       });
 
-      XLSX.writeFile(newWorkbook, "Combined_Workbook.xlsx");
+      // Save with compression to reduce file size
+      XLSX.writeFile(newWorkbook, "Combined_Workbook.xlsx", { compression: true });
       outputDiv.textContent = "Download complete!";
     }
 
