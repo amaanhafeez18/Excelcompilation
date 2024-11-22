@@ -84,12 +84,15 @@
       outputDiv.textContent = "Download complete!";
     }
 
-    combineButton.addEventListener("click", () => {
-      outputDiv.textContent = "";
-      progressDiv.innerHTML = "Processing files...<br>";
-      worker.postMessage(fileData.map(f => ({ name: f.name, buffer: f.arrayBuffer() })));
-    });
-
+    combineButton.addEventListener("click", async () => {
+       outputDiv.textContent = "";
+       progressDiv.innerHTML = "Processing files...<br>";
+       const filesData = await Promise.all(fileData.map(async f => ({
+           name: f.name,
+           buffer: await f.arrayBuffer()  // Await the promise and get the buffer
+       })));
+       worker.postMessage(filesData);  // Pass the resolved buffers
+   });
   </script>
 </body>
 </html>
