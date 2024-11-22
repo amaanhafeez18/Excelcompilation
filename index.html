@@ -46,21 +46,13 @@
   <button id="combineButton" disabled>Combine and Download</button>
   <div id="progress"></div>
   <div id="output"></div>
-
   <script>
     const fileInput = document.getElementById("fileInput");
     const combineButton = document.getElementById("combineButton");
     const progressDiv = document.getElementById("progress");
     const outputDiv = document.getElementById("output");
-
-    let fileData = []; // Store data from uploaded files
-    const sheetNames = ["Company Details", "Financial Info", "Executive"];
-    const combinedSheets = {
-      "Company Details": [],
-      "Financial Info": [],
-      "Executive": [],
-    };
-
+    let fileData = [];
+    
     // Enable the combine button when files are selected
     fileInput.addEventListener("change", (event) => {
       fileData = Array.from(event.target.files);
@@ -68,63 +60,38 @@
       progressDiv.innerHTML = `${fileData.length} files selected.`;
     });
 
-    // Function to process and combine files
-    async function processFiles() {
-      outputDiv.textContent = "";
-      progressDiv.innerHTML = "Processing files...<br>";
-      const totalFiles = fileData.length;
+    // Utilizing Web Worker if available
+    const worker = new Worker('worker.js');
 
-      for (let i = 0; i < totalFiles; i++) {
-        const file = fileData[i];
-        try {
-          const fileBuffer = await file.arrayBuffer();
-          const workbook = XLSX.read(fileBuffer, { type: "array" });
-
-          sheetNames.forEach((sheetName) => {
-            const sheet = workbook.Sheets[sheetName];
-            if (sheet) {
-              const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-              if (sheetData.length > 0) {
-                if (combinedSheets[sheetName].length === 0) {
-                  combinedSheets[sheetName].push(sheetData[0]); // Add header row
-                }
-                // Filter out empty rows
-                const dataRows = sheetData.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== null));
-                combinedSheets[sheetName].push(...dataRows); // Add only non-empty data rows
-              }
-            }
-          });
-
-          // Update progress
-          const percentage = Math.round(((i + 1) / totalFiles) * 100);
-          progressDiv.innerHTML += `Processed ${file.name} (${percentage}%)<br>`;
-        } catch (error) {
-          progressDiv.innerHTML += `Error processing ${file.name}: ${error.message}<br>`;
-        }
+    worker.onmessage = function(event) {
+      if (event.data.type === 'progress') {
+        progressDiv.innerHTML += `${event.data.message}<br>`;
+      } else if (event.data.type === 'complete') {
+        outputDiv.textContent = "Files processed. Preparing combined file for download...";
+        createAndDownloadWorkbook(event.data.combinedSheets);
+      } else if (event.data.type === 'error') {
+        progressDiv.innerHTML += `Error processing ${event.data.file}: ${event.data.error}<br>`;
       }
+    };
 
-      outputDiv.textContent = "Files processed. Preparing combined file for download...";
-      createCombinedWorkbook();
-    }
-
-    // Create combined workbook and download
-    function createCombinedWorkbook() {
+    function createAndDownloadWorkbook(combinedSheets) {
       const newWorkbook = XLSX.utils.book_new();
-
-      sheetNames.forEach((sheetName) => {
+      for (const sheetName in combinedSheets) {
         if (combinedSheets[sheetName].length > 0) {
           const worksheet = XLSX.utils.aoa_to_sheet(combinedSheets[sheetName]);
           XLSX.utils.book_append_sheet(newWorkbook, worksheet, sheetName);
         }
-      });
-
-      // Save with compression to reduce file size
+      }
       XLSX.writeFile(newWorkbook, "Combined_Workbook.xlsx", { compression: true });
       outputDiv.textContent = "Download complete!";
     }
 
     // Event listener for the combine button
-    combineButton.addEventListener("click", processFiles);
+    combineButton.addEventListener("click", () => {
+      outputDiv.textContent = "";
+      progressDiv.innerHTML = "Processing files...<br>";
+      worker.postMessage(fileData);
+    });
   </script>
 </body>
 </html>
