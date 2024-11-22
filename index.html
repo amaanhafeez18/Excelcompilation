@@ -52,15 +52,13 @@
     const progressDiv = document.getElementById("progress");
     const outputDiv = document.getElementById("output");
     let fileData = [];
-    
-    // Enable the combine button when files are selected
+
     fileInput.addEventListener("change", (event) => {
       fileData = Array.from(event.target.files);
       combineButton.disabled = fileData.length === 0;
       progressDiv.innerHTML = `${fileData.length} files selected.`;
     });
 
-    // Utilizing Web Worker if available
     const worker = new Worker('worker.js');
 
     worker.onmessage = function(event) {
@@ -86,12 +84,12 @@
       outputDiv.textContent = "Download complete!";
     }
 
-    // Event listener for the combine button
     combineButton.addEventListener("click", () => {
       outputDiv.textContent = "";
       progressDiv.innerHTML = "Processing files...<br>";
-      worker.postMessage(fileData);
+      worker.postMessage(fileData.map(f => ({ name: f.name, buffer: f.arrayBuffer() })));
     });
+
   </script>
 </body>
 </html>
